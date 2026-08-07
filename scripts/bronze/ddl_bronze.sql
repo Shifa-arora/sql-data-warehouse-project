@@ -8,6 +8,18 @@ Script Purpose:
 ==============================================================================================
 */
 
+-- Create bronze schema if it doesn't exist
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.schemas
+    WHERE name = 'bronze'
+)
+BEGIN
+    EXEC('CREATE SCHEMA bronze');
+END;
+GO
+
+
 -- CREATE SQL DDL SCRIPTS FOR ALL CSV FILES IN crm and erp --
 
 IF OBJECT_ID ('bronze.crm_cust_info','U') IS NOT NULL
