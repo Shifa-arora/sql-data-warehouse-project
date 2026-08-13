@@ -165,25 +165,52 @@ BEGIN
 	--===================erp======================
 
 
-	IF OBJECT_ID('silver.erp_cust_az121', 'U') IS NOT NULL
+	IF OBJECT_ID('silver.erp_cust_az12', 'U') IS NOT NULL
 	BEGIN
 		TRUNCATE TABLE silver.erp_cust_az12;
 	END;
 
-	INSERT INTO silver.erp_cust_az12(cid, bdate, gen)
+	INSERT INTO silver.erp_cust_az12 (
+		cid,
+		bdate,
+		gen
+	)
+	SELECT
+		cid,
+		bdate,
+		gen
+	FROM (
+		SELECT 
+			CASE 
+				WHEN cid LIKE 'NAS%' 
+					THEN SUBSTRING(cid, 4, LEN(cid))
+				ELSE cid
+			END AS cid,
 
-	SELECT 
-		CASE WHEN cid LIKE 'NAS%' THEN SUBSTRING(cid, 4, LEN(cid))
-			ELSE cid
-		END AS cid,
-		CASE WHEN bdate > GETDATE() THEN NULL
-			ELSE bdate
-		END AS bdate,
-		CASE WHEN UPPER(TRIM(gen)) IN ('F', 'FEMALE') THEN 'Female'
-			WHEN UPPER(TRIM(gen)) IN ('M', 'MALE') THEN 'Male'
-			ELSE 'n/a'
-		END AS gen
-	FROM bronze.erp_cust_az12
+			CASE 
+				WHEN bdate > GETDATE() THEN NULL
+				ELSE bdate
+			END AS bdate,
+
+			CASE 
+				WHEN UPPER(TRIM(gen)) IN ('F', 'FEMALE') THEN 'Female'
+				WHEN UPPER(TRIM(gen)) IN ('M', 'MALE') THEN 'Male'
+				ELSE 'n/a'
+			END AS gen,
+
+			ROW_NUMBER() OVER (
+				PARTITION BY 
+					CASE 
+						WHEN cid LIKE 'NAS%' 
+							THEN SUBSTRING(cid, 4, LEN(cid))
+						ELSE cid
+					END
+				ORDER BY bdate DESC
+			) AS rn
+
+		FROM bronze.erp_cust_az12
+	) t
+	WHERE rn = 1;
 
 	---DATA QUALITY---
 	/*
@@ -220,16 +247,36 @@ BEGIN
 		TRUNCATE TABLE silver.erp_loc_a101;
 	END;
 
-	INSERT INTO silver.erp_loc_a101(cid, cntry)
+	INSERT INTO silver.erp_loc_a101 (
+		cid,
+		cntry
+	)
+	SELECT
+		cid,
+		cntry
+	FROM (
+		SELECT
+			REPLACE(cid, '-', '') AS cid,
 
-	SELECT 
-		REPLACE(cid,'-','') cid,
-		CASE WHEN TRIM(cntry) = 'DE' THEN 'Germany'
-			WHEN TRIM(cntry) IN ('US', 'USA') THEN 'United States'
-			WHEN TRIM(cntry) = '' OR cntry IS NULL THEN 'n/a'
-			ELSE TRIM(cntry)
-		END AS cntry
-	FROM bronze.erp_loc_a101
+			CASE 
+				WHEN TRIM(cntry) = 'DE' THEN 'Germany'
+				WHEN TRIM(cntry) IN ('US', 'USA') THEN 'United States'
+				WHEN TRIM(cntry) = '' OR cntry IS NULL THEN 'n/a'
+				ELSE TRIM(cntry)
+			END AS cntry,
+
+			ROW_NUMBER() OVER (
+				PARTITION BY REPLACE(cid, '-', '')
+				ORDER BY 
+					CASE 
+						WHEN TRIM(cntry) IS NULL OR TRIM(cntry) = '' THEN 1
+						ELSE 0
+					END
+			) AS rn
+
+		FROM bronze.erp_loc_a101
+	) t
+	WHERE rn = 1;
 
 	-- WHERE REPLACE(cid,'-','') NOT IN (SELECT cst_key FROM silver.crm_cust_info)
 
